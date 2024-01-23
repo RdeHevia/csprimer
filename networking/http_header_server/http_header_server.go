@@ -48,23 +48,18 @@ func getHeaders(requestRaw string) (headers map[string]string) {
 	return headers
 }
 
-func main() {
-	server, err := net.Listen("tcp", "localhost:1234")
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	defer server.Close()
-
+func handleConnection(connection net.Conn) {
 	buffer := make([]byte, 4000)
+	log.Println("New connection established")
+
 	for {
-		connection, err := server.Accept()
-		log.Println("New connection established")
-		if err != nil {
-			log.Fatalln(err)
+		byteCount, _ := connection.Read(buffer)
+		if byteCount == 0 {
+			log.Println("No data - closing the TCP connection")
+			connection.Close()
+			break
 		}
 
-		byteCount, _ := connection.Read(buffer)
 		requestRaw := strings.ReplaceAll(string(buffer), "\r", "")
 		requestLines := strings.Split(requestRaw, "\n")
 		if len(requestLines) == 0 {
@@ -72,8 +67,7 @@ func main() {
 		}
 		log.Println(byteCount)
 
-		// logStruct(requestLines)
-		// requestLine := requestLines[0]
+		logStruct(requestLines)
 
 		headers := getHeaders(requestRaw)
 
@@ -87,7 +81,23 @@ func main() {
 		responseLine := "HTTP/1.1 200 OK\r\n\r\n"
 		connection.Write([]byte(responseLine))
 		connection.Write(responseBytes)
+		connection.Close()
+	}
+}
 
-		connection.Close() // Try to not have this
+func main() {
+	server, err := net.Listen("tcp", "localhost:1234")
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	defer server.Close()
+
+	for {
+		connection, err := server.Accept()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		go handleConnection(connection)
 	}
 }
